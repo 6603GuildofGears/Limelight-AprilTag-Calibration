@@ -6,7 +6,7 @@ A fast, automated calibration tool for optimizing AprilTag detection stability o
 
 This tool automatically tunes Limelight camera parameters to minimize position jitter when detecting AprilTags. Instead of manually adjusting settings, the optimizer systematically tests parameter combinations and uses a "range-center" algorithm to find robust settings that work across varying conditions.
 
-**Developed for FTC "Reefscape" 2025-2026 season.**
+**Developed for FTC "Decode" 2025-2026 season.**
 
 ## Features
 
