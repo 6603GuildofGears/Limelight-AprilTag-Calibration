@@ -49,7 +49,7 @@ The optimizer runs through 5 phases:
 
 ### Phase 2: Coarse Parameter Search
 - Tests a 5×5 grid of exposure and gain combinations
-- **Exposure range**: 2400, 2800, 3200, 3600, 4000
+- **Exposure range**: 2400, 2600, 2800, 3000, 3200
 - **Gain range**: 6, 7, 8, 9, 10
 - Tracks which combinations improve on baseline
 - Uses "range-center" logic to pick the middle of good values (more robust than single best)
@@ -103,7 +103,7 @@ The optimizer tunes these Limelight parameters:
 
 | Parameter | Description | Typical Range |
 |-----------|-------------|---------------|
-| `exposure` | Camera exposure time (×0.01ms) | 2400-4000 |
+| `exposure` | Camera exposure time (×0.01ms) | 2400-3300 |
 | `sensor_gain` | Sensor amplification | 6-10 |
 | `fiducial_refine_method` | AprilTag corner refinement algorithm | 0-3 |
 | `black_level` | Black level offset | 15-25 |

@@ -168,7 +168,7 @@ def main():
     
     # These ranges are based on what we learned works for this camera
     # Higher exposure + lower gain = cleaner image
-    exposures = [2400, 2800, 3200, 3600, 4000]
+    exposures = [2400, 2600, 2800, 3000, 3200]
     gains = [6, 7, 8, 9, 10]
     
     coarse_results = []
@@ -270,7 +270,7 @@ def main():
     gain_val = best_settings['sensor_gain']
     
     exp_range = [exp_val - 200, exp_val - 100, exp_val, exp_val + 100, exp_val + 200]
-    exp_range = [e for e in exp_range if 800 <= e <= 3000]
+    exp_range = [e for e in exp_range if 800 <= e <= 3300]
     
     gain_range = [gain_val - 1, gain_val - 0.5, gain_val, gain_val + 0.5, gain_val + 1]
     gain_range = [g for g in gain_range if 4 <= g <= 30]
