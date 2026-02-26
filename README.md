@@ -1,174 +1,182 @@
 # 🎯 Limelight AprilTag Calibration Optimizer
 
-A fast, automated calibration tool for optimizing AprilTag detection stability on Limelight cameras. Achieves sub-millimeter position stability in approximately 60-70 seconds.
+An automated calibration tool for optimizing AprilTag detection stability on Limelight 3A cameras. Starts from Limelight's official recommended settings and systematically dials them in for your specific setup.
 
 ## Overview
 
-This tool automatically tunes Limelight camera parameters to minimize position jitter when detecting AprilTags. Instead of manually adjusting settings, the optimizer systematically tests parameter combinations and uses a "range-center" algorithm to find robust settings that work across varying conditions.
+This tool automatically tunes Limelight camera parameters to minimize position jitter when detecting AprilTags. It begins with Limelight's documented best practices (black_level=0, high gain, low exposure) and uses a 6-phase optimization process with a "range-center" algorithm to find robust settings.
 
-**Developed for FTC "Decode" 2025-2026 season.**
+**Developed for FRC Team 6603 — Guild of Gears, 2025-2026 season.**
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `optimize.py` | **Main optimizer** — starts from official recommended settings |
+| `old_final_optimize.py` | Legacy optimizer (old approach: high exposure, low gain) — kept for reference |
 
 ## Features
 
-- ⚡ **Fast optimization** - Complete calibration in ~60-70 seconds
-- 🎯 **Sub-millimeter accuracy** - Achieves 0.5-2mm position stability
-- 🔄 **Auto-detection** - Automatically detects AprilTags 20 or 24
-- �� **Range-center algorithm** - Finds robust settings, not just single best points
-- 🛡️ **Safe defaults** - Starts from proven working settings
-- 📈 **Verbose mode** - Optional detailed output for debugging
+- ⚡ **~2.5 minute optimization** — complete 6-phase calibration
+- 🎯 **3-5mm position stability** — Z-depth standard deviation
+- 🔄 **Auto-detection** — finds Limelight via ping (172.28.0.1 / 172.29.0.1)
+- 🧠 **Range-center algorithm** — picks the middle of good plateaus, not noisy single bests
+- 📋 **Official baseline** — starts from Limelight's documented recommendations
+- 📈 **Verbose mode** — optional detailed output for every test point
 
 ## Requirements
 
 - Python 3.x
 - `requests` library (`pip install requests`)
-- Limelight camera on network (default: `172.29.0.1`)
-- AprilTag visible to camera (Tags 20 or 24)
+- Limelight 3A connected via USB (auto-detected via ping)
+- AprilTag visible to camera (Tags 20 or 24, family 36h11, 165.1mm)
 
 ## Usage
 
-### Basic Usage (Normal Output)
+### Basic Usage
 ```bash
-python3 final_optimize.py
+python optimize.py
 ```
 
-### Verbose Mode (Detailed Output)
+### Verbose Mode (see every test point)
 ```bash
-python3 final_optimize.py -v
-# or
-python3 final_optimize.py --verbose
+python optimize.py -v
 ```
 
 ## How It Works
 
-The optimizer runs through 5 phases:
+The optimizer runs through 6 phases:
 
-### Phase 1: Detection & Baseline
-- Applies safe baseline settings to the camera
-- Detects which AprilTag is visible (Tag 20 or 24)
-- Measures initial stability as a baseline
+### Phase 1: Apply Recommended Baseline & Detect Tag
+- Applies Limelight's official recommended settings (gain=15, black_level=0, moderate exposure)
+- Auto-detects which AprilTag is visible (Tag 20 or 24)
+- Measures baseline stability
 
-### Phase 2: Coarse Parameter Search
-- Tests a 5×5 grid of exposure and gain combinations
-- **Exposure range**: 2400, 2600, 2800, 3000, 3200
-- **Gain range**: 6, 7, 8, 9, 10
-- Tracks which combinations improve on baseline
-- Uses "range-center" logic to pick the middle of good values (more robust than single best)
+### Phase 2: Find Minimum Usable Exposure
+- Coarse sweep: 400–2800 in steps of 400
+- Finds the lowest exposure with >80% detection, then picks best stability
+- Fine sweep: ±300 around winner in steps of 100
+- Uses range-center selection for robustness
 
-### Phase 3: Fine-Tune Secondary Parameters
-Tests and optimizes these parameters in sequence:
-1. **Fiducial Refine Method** (None, Subpixel, Decode, Pose)
-2. **Black Level** (15, 18, 20, 22, 25)
-3. **Sharpening** (0, 0.05, 0.1, 0.15)
-4. **Red Balance** (1180, 1230, 1280, 1330, 1380)
-5. **Blue Balance** (1400, 1450, 1500, 1550, 1600)
+### Phase 3: Optimize Sensor Gain
+- Coarse sweep: 5, 10, 15, 20, 25, 30
+- Fine sweep: ±3 around winner in steps of 1
+- Range-center selection
 
-Each parameter is tested independently while keeping others fixed. The algorithm finds values within 1.5× of the best result and picks the center of that range.
+### Phase 4: Tune Secondary Parameters
+Tests each independently while keeping others fixed:
+1. **Refine Method** — None, Subpixel, Decode, Pose (picks lowest jitter)
+2. **Black Level** — 0, 5, 10, 15 (range-center)
+3. **Sharpening** — 0, 0.05, 0.1, 0.15, 0.2 (range-center)
 
-### Phase 4: Cycling Refinement
-- Fine-tunes exposure and gain with tighter ranges (±200 for exposure, ±1 for gain)
-- Allows parameters to re-adjust based on changes from Phase 3
+### Phase 5: Joint Exposure + Gain Refinement
+- Tests a 3×3 grid around current best (±200 exposure, ±2 gain)
+- Catches interactions between the two most impactful parameters
 
-### Phase 5: Verification
-- Applies final settings
-- Runs 3 verification rounds
+### Phase 6: Verification
+- 3 rounds of 100 samples each
 - Reports average stability and detection rate
 - Leaves optimal settings applied to camera
 
 ## Configuration
 
-Edit these values at the top of `final_optimize.py`:
+Edit these values at the top of `optimize.py`:
 
 ```python
-# Camera IP address
-LIMELIGHT_IP = '172.29.0.1'
+# IPs to try (auto-detected via ping)
+CANDIDATE_IPS = ['172.28.0.1', '172.29.0.1']
 
 # AprilTags to look for
 TARGET_TAGS = [20, 24]
 
-# Starting baseline settings
-SAFE_SETTINGS = {
-    'exposure': 3200,
-    'sensor_gain': 8.2,
-    'fiducial_refine_method': 1,
-    'black_level': 20,
+# Official recommended starting point
+RECOMMENDED_BASELINE = {
+    'black_level': 0,
+    'sensor_gain': 15,
+    'exposure': 1200,
+    'fiducial_refine_method': 1,  # Subpixel
     'sharpening': 0,
-    'red_balance': 1280,
-    'blue_balance': 1500,
+    'red_balance': 1200,
+    'blue_balance': 1600,
 }
 ```
 
 ## Output Parameters
 
-The optimizer tunes these Limelight parameters:
-
-| Parameter | Description | Typical Range |
-|-----------|-------------|---------------|
-| `exposure` | Camera exposure time (×0.01ms) | 2400-3300 |
-| `sensor_gain` | Sensor amplification | 6-10 |
-| `fiducial_refine_method` | AprilTag corner refinement algorithm | 0-3 |
-| `black_level` | Black level offset | 15-25 |
-| `sharpening` | Image sharpening amount | 0-0.15 |
-| `red_balance` | White balance - red channel | 1180-1380 |
-| `blue_balance` | White balance - blue channel | 1400-1600 |
+| Parameter | Description | Typical Optimized Range |
+|-----------|-------------|------------------------|
+| `exposure` | Camera exposure time | 2000–2800 |
+| `sensor_gain` | Sensor amplification | 15–25 |
+| `black_level` | Black level offset | 0–10 |
+| `fiducial_refine_method` | Corner refinement (0=None, 1=Subpixel, 2=Decode, 3=Pose) | 0–1 |
+| `sharpening` | Image sharpening | 0.05–0.15 |
+| `red_balance` | White balance — red channel | 1200 (untouched) |
+| `blue_balance` | White balance — blue channel | 1600 (untouched) |
 
 ## Stability Measurement
 
-Stability is measured as the **standard deviation of Z-axis position** (in millimeters) over multiple samples. Lower values = more stable readings.
+Stability is measured as the **standard deviation of Z-axis depth** (in millimeters) from `t6t_cs` over multiple samples. Lower = more stable.
 
 | Stability | Quality |
 |-----------|---------|
 | < 1mm | Excellent ⭐ |
-| 1-2mm | Very Good |
-| 2-3mm | Good |
-| 3-5mm | Acceptable |
+| 1–2mm | Very Good |
+| 2–3mm | Good |
+| 3–5mm | Acceptable |
 | > 5mm | Needs improvement |
 
 ## Example Output
 
 ```
 ============================================================
-🎯 LIMELIGHT QUICK OPTIMIZER
+🎯 LIMELIGHT 3A OPTIMIZER — Official Recommended Start
 ============================================================
+   Strategy: black_level=0, high gain, lowest usable exposure
 
-📡 PHASE 1: Detecting tag and baseline...
-   ✅ Detected Tag 24
-   📊 Baseline: 0.79mm stability (100% detection)
+📡 PHASE 1: Applying recommended baseline & detecting tag...
+   ✅ Detected Tag 20
+   📊 Recommended baseline: 5.35mm stability (100% detection)
 
-🔍 PHASE 2: Coarse parameter search...
-   ✅ Best so far: exp=3200 gain=9 (0.58mm)
+🔦 PHASE 2: Finding minimum usable exposure (gain=15, black=0)...
+   📉 Lowest reliable exposure: 400
+   🏆 Best stability exposure:  2400 (4.0mm)
+   ✅ Exposure: 2400  (4.0mm)
 
-🎛️  PHASE 3: Fine-tuning secondary parameters...
-   ✅ Refine method: Decode
-   ✅ Black level: 20
+📈 PHASE 3: Optimizing sensor gain...
+   ✅ Gain: 20  (4.0mm)
+
+🎛️  PHASE 4: Tuning secondary parameters...
+   ✅ Refine method: None
+   ✅ Black level: 10
    ✅ Sharpening: 0.15
-   ✅ Red balance: 1280
-   ✅ Blue balance: 1500
 
-🔄 PHASE 4: Cycling refinement...
-   ✅ Refined: exp=3000 gain=9
+🔄 PHASE 5: Joint exposure + gain refinement...
+   ⭐ Improved! exp=2400 gain=22 → 3.8mm
 
-✅ PHASE 5: Verification...
-   Round 1: 0.76mm (100%)
-   Round 2: 0.72mm (100%)
-   Round 3: 0.87mm (100%)
+✅ PHASE 6: Verification (3 rounds of 100 samples)...
+   Round 1: 4.63mm (100%)
+   Round 2: 4.06mm (100%)
+   Round 3: 4.36mm (100%)
 
 ============================================================
 🏆 OPTIMIZATION COMPLETE
 ============================================================
 
-⏱️  Time: 69.5 seconds
-🏷️  Tag: 24
+⏱️  Time: 148.9s
+🏷️  Tag:  20
 
-📊 Final Stability: 0.78mm (100% detection)
+📊 Baseline (recommended):  5.35mm
+📊 Final stability:         4.35mm  (100% detection)
+📈 Improvement:             1.00mm better (19%)
 
 ⚙️  Optimal Settings:
-   exposure: 3000
-   sensor_gain: 9
-   fiducial_refine_method: 2 (Decode)
-   black_level: 20
-   sharpening: 0.15
-   red_balance: 1280
-   blue_balance: 1500
+   exposure:               2400
+   sensor_gain:            22
+   black_level:            10
+   fiducial_refine_method: 0 (None)
+   sharpening:             0.15
+   red_balance:            1200
+   blue_balance:           1600
 
 ✅ Settings applied to camera!
 ============================================================
@@ -176,37 +184,37 @@ Stability is measured as the **standard deviation of Z-axis position** (in milli
 
 ## Algorithm: Range-Center Selection
 
-Instead of simply picking the single best value for each parameter, the optimizer uses a "range-center" approach:
+Instead of picking the single best value (which may be noisy), the optimizer uses a "range-center" approach:
 
 1. Test all values for a parameter
-2. Find the best result
-3. Identify all values within 1.5× of the best (the "good range")
-4. Pick the **center** of that range
+2. Find the best stability result
+3. Identify all values within 1.5× of the best (the "plateau")
+4. Pick the **center** of that plateau
 
-This produces more robust settings that are less sensitive to minor variations in lighting, distance, or angle.
+This produces more robust settings that are less sensitive to measurement noise, lighting changes, or distance variations. Across multiple runs, this consistently lands on similar values.
 
 ## Tips for Best Results
 
-1. **Stable mounting** - Ensure the camera is rigidly mounted
-2. **Good lighting** - Consistent ambient lighting helps
-3. **Tag visibility** - Tag should be clearly visible, not at extreme angles
-4. **Run multiple positions** - Test at different distances/angles to find universal settings
-5. **Start with safe settings** - If detection fails, increase exposure in SAFE_SETTINGS
+1. **Stable mounting** — ensure the camera is rigidly mounted during calibration
+2. **Consistent lighting** — avoid flickering lights or changing sunlight
+3. **Tag visibility** — tag should be clearly visible, not at extreme angles
+4. **Run multiple times** — settings should converge across runs; average the results
+5. **Lower resolution** — can improve pipeline latency with minimal stability impact
 
 ## API Reference
 
-The tool communicates with Limelight via HTTP REST API:
+The tool communicates with Limelight via HTTP REST API on port 5807:
 
-- **Settings**: `POST http://<IP>:5807/update-pipeline` with JSON body
-- **Results**: `GET http://<IP>:5807/results` returns detection data
+- **Apply settings**: `POST http://<IP>:5807/update-pipeline` with JSON body
+- **Read results**: `GET http://<IP>:5807/results` returns detection data including `t6t_cs` (target pose in camera space)
 
 ## License
 
-MIT License - Feel free to use and modify for your FTC team!
+MIT License — feel free to use and modify for your team!
 
 ## Credits
 
-Developed by FRC Team 6603 - Guild of Gears
+Developed by FRC Team 6603 — Guild of Gears
 
 ---
 

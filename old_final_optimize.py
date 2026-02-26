@@ -17,7 +17,7 @@ import sys
 # ============================================================
 # CONFIGURATION
 # ============================================================
-LIMELIGHT_IP = '172.29.0.1'
+LIMELIGHT_IP = '172.28.0.1'
 BASE = f'http://{LIMELIGHT_IP}:5807'
 
 # Tags to look for (will auto-detect)
